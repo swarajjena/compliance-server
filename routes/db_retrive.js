@@ -71,7 +71,7 @@ router.post('/filter_data',async (req,res) => {
     let jm_db_columns =  result_jm.recordset.map(column => "jm."+column.COLUMN_NAME)
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
-    let jm_filters = filters.filter(fl => (fl.selected!="ALL" && jm_columns.indexOf(fl.Attribute_name)>=0))
+    let jm_filters = filters.filter(fl => (fl.selected && jm_columns.indexOf(fl.Attribute_name)>=0))
     jm_filters = jm_filters.map(filter => " AND jm."+filter.Attribute_name+" = '"+filter.selected+"'")
 
     jm_filters = jm_filters.map(filter => {
