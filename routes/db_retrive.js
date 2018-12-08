@@ -77,7 +77,7 @@ router.post('/filter_data',async (req,res) => {
     jm_filters = jm_filters.map(filter => {
       let qry= "AND (";
       for (let opt of filter.selected){
-        if(qry != "AND "){
+        if(qry != "AND ("){
             qry = qry + " OR ";
         }          
         qry = qry + " jm."+filter.Attribute_name+" = '"+opt+"'";
