@@ -47,7 +47,7 @@ router.post('/filter_data',async (req,res) => {
     let lm_db_columns =  result.recordset.map(column => "lm."+column.COLUMN_NAME)
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
-    let lm_filters = filters.filter(fl => (fl.selected && lm_columns.indexOf(fl.Attribute_name)>=0))
+    let lm_filters = filters.filter(fl => (fl.selected  && fl.selected.length>0 && lm_columns.indexOf(fl.Attribute_name)>=0))
     lm_filters = lm_filters.map(filter => {
         let qry= "AND (";
         for (let opt of filter.selected){
@@ -71,7 +71,7 @@ router.post('/filter_data',async (req,res) => {
     let jm_db_columns =  result_jm.recordset.map(column => "jm."+column.COLUMN_NAME)
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
-    let jm_filters = filters.filter(fl => (fl.selected && jm_columns.indexOf(fl.Attribute_name)>=0))
+    let jm_filters = filters.filter(fl => (fl.selected && fl.selected.length>0 && jm_columns.indexOf(fl.Attribute_name)>=0))
 
     jm_filters = jm_filters.map(filter => {
       let qry= "AND (";
