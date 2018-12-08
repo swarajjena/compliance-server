@@ -11,7 +11,7 @@ router.get('/all_filters', async (req, res) => {
   try {
     const pool = await poolPromise
     const result = await pool.request()
-        .query('select TOP 10 * from Attribute_Filter')      
+        .query('select TOP 30 * from Attribute_Filter')      
 
     res.json(result.recordset)
   } catch (err) {
@@ -47,7 +47,7 @@ router.post('/filter_data',async (req,res) => {
     let lm_db_columns =  result.recordset.map(column => "lm."+column.COLUMN_NAME)
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
-    let lm_filters = filters.filter(fl => (fl.selected!="ALL" && lm_columns.indexOf(fl.Attribute_name)>=0))
+    let lm_filters = filters.filter(fl => (fl.selected!=null && lm_columns.indexOf(fl.Attribute_name)>=0))
     lm_filters = lm_filters.map(filter => {
         let qry= "AND (";
         for (let opt of filter.selected){
