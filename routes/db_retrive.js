@@ -88,8 +88,11 @@ router.post('/filter_data',async (req,res) => {
 
 
 
+
     db_columns = [...lm_db_columns , ...jm_db_columns];
     filters = [...lm_filters, ...jm_filters];
+
+    console.log(JSON.stringify(filters))
 
     let columns_sql = db_columns.join(" , ");
     let filters_sql = filters.join("");
