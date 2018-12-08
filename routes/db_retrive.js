@@ -72,7 +72,6 @@ router.post('/filter_data',async (req,res) => {
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
     let jm_filters = filters.filter(fl => (fl.selected && jm_columns.indexOf(fl.Attribute_name)>=0))
-    jm_filters = jm_filters.map(filter => " AND jm."+filter.Attribute_name+" = '"+filter.selected+"'")
 
     jm_filters = jm_filters.map(filter => {
       let qry= "AND (";
