@@ -48,7 +48,20 @@ router.post('/filter_data',async (req,res) => {
                         .filter(column => !(column.indexOf("_ID")>=0)) 
 
     let lm_filters = filters.filter(fl => (fl.selected!="ALL" && lm_columns.indexOf(fl.Attribute_name)>=0))
-    lm_filters = lm_filters.map(filter => " AND lm."+filter.Attribute_name+" = '"+filter.selected+"'")
+    lm_filters = lm_filters.map(filter => {
+        let qry= "AND (";
+        for (let opt of filter.selected){
+          if(qry != "AND "){
+              qry = qry + " OR ";
+          }          
+          qry = qry + " lm."+filter.Attribute_name+" = '"+opt+"'";
+        }
+        qry = qry + ")";
+        return qry;
+      }
+    )
+      
+    
 
     const result_jm = await pool.request()
         .query("select COLUMN_NAME from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = 'Jurisdiction_Master'")
@@ -60,6 +73,19 @@ router.post('/filter_data',async (req,res) => {
 
     let jm_filters = filters.filter(fl => (fl.selected!="ALL" && jm_columns.indexOf(fl.Attribute_name)>=0))
     jm_filters = jm_filters.map(filter => " AND jm."+filter.Attribute_name+" = '"+filter.selected+"'")
+
+    jm_filters = jm_filters.map(filter => {
+      let qry= "AND (";
+      for (let opt of filter.selected){
+        if(qry != "AND "){
+            qry = qry + " OR ";
+        }          
+        qry = qry + " jm."+filter.Attribute_name+" = '"+opt+"'";
+      }
+      qry = qry + ")";
+      return qry;
+    })
+
 
 
     db_columns = [...lm_db_columns , ...jm_db_columns];
