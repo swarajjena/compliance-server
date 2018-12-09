@@ -57,14 +57,13 @@ router.post('/filter_data',async (req,res) => {
           qry = qry + " lm."+filter.Attribute_name+" = '"+opt+"'";
         }
         qry = qry + ")";
-        return qry;
-      }
-    )
+        return qry;      
+    })
       
     
 
     const result_jm = await pool.request()
-        .query("select COLUMN_NAME from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = 'Jurisdiction_Master'")
+        .query("select COLUMN_NAME from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = 'Jurisdiction_Master'");
         
 
     let jm_columns =  result_jm.recordset.map(column => column.COLUMN_NAME)

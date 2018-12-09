@@ -13,7 +13,7 @@ router.get('/table/:table', async (req, res) => {
     const pool = await poolPromise
     const result = await pool.request()
         .input('table_name', sql.VarChar, req.params.table)
-        .query('select TOP 10 * from '+req.params.table)      
+        .query('select * from '+req.params.table)      
 
 
     res.json(result.recordset)

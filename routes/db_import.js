@@ -6,6 +6,7 @@ const fs = require('fs');
 const xlsx = require('node-xlsx');
 const path = require('path')
 const SqlString = require('SqlString')
+const escapeString = require('sql-escape-string')
 
 var multer = require("multer")
 
@@ -28,11 +29,12 @@ router.get('/', function(req, res, next) {
   res.send('respond with a resource');
 });
 
-
+function mssql_real_escape_string (str) {
+  return escapeString(str)
+}
 
 
 router.get('/sheet_headers/:filename', function(req, res) {
-  console.log()
 
   let filepath=__dirname+"/../files/"+req.params.filename+".xlsx";
 
@@ -77,13 +79,25 @@ router.get('/sheet_names/:filename', function(req, res) {
   
 });
 
-router.get('/attribute_linkage', function (req, res) {
+router.get('/attribute_linkage/:filename', function (req, res) {
   try {
-    let filepath=__dirname+"/../files/linkage.json";
+
+    const workSheetsFromFile = xlsx.parse("files/"+req.params.filename+".xlsx");
+    
+    let all_headers = workSheetsFromFile[0]["data"][0];
+
+    let filepath;
+
+    if(all_headers.length<30)
+        filepath=__dirname+"/../files/linkage.json";
+    else  
+        filepath=__dirname+"/../files/linkage_cor.json";
+
 
     if(!fs.existsSync(filepath)){
       res.status(500)
       res.send("file_does_not_exists")
+      return;
     }
 
     fs.readFile(filepath, function(err,data) {
@@ -91,7 +105,24 @@ router.get('/attribute_linkage', function (req, res) {
         res.status(500)
         res.send(err.message)
       }
-      res.json({data:JSON.parse(data)})
+      let existing_attribute_linkage = JSON.parse(data);
+
+
+      let complete_attribute_linkage = all_headers.map((attr,key) =>{
+          let headers_in_existing_linkage = existing_attribute_linkage.map(att=>att.header);
+          let pos = headers_in_existing_linkage.indexOf(attr);
+          if(pos>=0){
+              let dt=existing_attribute_linkage[pos];
+              return new Object({id:key,header:attr, master_db:dt.master_db,master_attribute:dt.master_attribute,master_attribute_options:dt.master_attribute_options});
+          }else{
+            return new Object({id:key,header:attr, master_db:null,master_attribute:null,master_attribute_options:[]});
+          } 
+      })
+
+      res.json({data:complete_attribute_linkage});
+
+
+    
     });
   }catch (err) {
     res.status(500)
@@ -102,7 +133,13 @@ router.get('/attribute_linkage', function (req, res) {
 
 router.post('/store_attribute_linkage', function (req, res) {
   try {
-    let filepath=__dirname+"/../files/linkage.json";
+
+    let filepath;
+    if(req.body.linkage.length<30)
+        filepath=__dirname+"/../files/linkage.json";
+    else  
+        filepath=__dirname+"/../files/linkage_cor.json";
+
     fs.writeFile(filepath, JSON.stringify(req.body.linkage), function(err) {
       if(err) {
         res.status(500)
@@ -158,7 +195,7 @@ router.post('/validate_data', async (req, res) => {
 
     validation_result=[]
 
-    console.log(input_data)
+//    console.log(input_data)
 
     for(let row in input_data){
         let val_row = [] 
@@ -191,13 +228,20 @@ router.post('/store_validated_data', async (req, res) => {
 
     const workSheetsFromFile = xlsx.parse("files/"+req.body.filename+".xlsx");
 
+
+
     let law_name_idx=workSheetsFromFile[0]["data"][0].indexOf("Law Name")
+
     let parent_jurs_idx=workSheetsFromFile[0]["data"][0].indexOf("Parent Jurisdiction Name")
-  
+    
 
     for(let row in input_data){
 
-      let name_string = table_name.replace("Master","Name");
+      let name_string = ""
+      if(table_name === "Compliance_Master")
+          name_string = "Task_Name";
+      else
+          name_string = table_name.replace("Master","Name");
 
       const pool = await poolPromise
       const result = await pool.request()
@@ -206,21 +250,46 @@ router.post('/store_validated_data', async (req, res) => {
           .query('select  * from '+table_name+ " where "+name_string+" = @field_value")
           
       if(result.recordset.length<=0){
-        if(name_string!="Jurisdiction_Name"){
-          for(let rw of workSheetsFromFile[0]["data"]){
-            if(rw[law_name_idx]==input_data[row][name_string]){
-                let parent_jurisdiction = rw[parent_jurs_idx]
-                console.log(parent_jurisdiction+" lllll")
-                const rslt = await pool.request()
-                .input('jurisdiction_name', sql.VarChar, parent_jurisdiction)
-                .query('select  * from Jurisdiction_Master where Jurisdiction_Name = @jurisdiction_name') 
-                
-                if(rslt.recordset.length>0){
-                    input_data[row]["Jurisdiction_ID"]=rslt.recordset[0]["Jurisdiction_ID"]
-                }
-                break;
-            }
+
+        let row_data_from_excel = null;
+        let name_idx = workSheetsFromFile[0]["data"][0].indexOf(name_string.replace("_"," "));
+        for(let rw of workSheetsFromFile[0]["data"]){
+          if(rw[name_idx]==input_data[row][name_string]){
+            row_data_from_excel = rw;
           }
+        }
+
+        const fk_pool = await poolPromise
+        const fk_result = await fk_pool.request()
+            .input('table_name', sql.VarChar, table_name)
+            .query(
+              " SELECT fk.name,OBJECT_NAME(fk.parent_object_id) 'Parent table',c1.name 'Parent column',OBJECT_NAME(fk.referenced_object_id) 'Referenced table',c2.name 'Referenced column'"+
+              " FROM   sys.foreign_keys fk " +
+              " INNER  JOIN  sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id "+
+              " INNER  JOIN  sys.columns c1 ON fkc.parent_column_id = c1.column_id AND fkc.parent_object_id = c1.object_id "+
+              " INNER  JOIN  sys.columns c2 ON fkc.referenced_column_id = c2.column_id AND fkc.referenced_object_id = c2.object_id "+
+              " WHERE  OBJECT_NAME(fk.parent_object_id)=@table_name"      
+            )
+
+        for (let fk_res of fk_result.recordset){
+          let foreign_name_string = fk_res["Referenced table"].replace("Master","Name");
+          let foreign_idx = workSheetsFromFile[0]["data"][0].indexOf(foreign_name_string.replace("_"," "));
+          if(foreign_idx<0)
+            continue;
+          let foreign_value = row_data_from_excel[foreign_idx];
+          const fs_pool = await poolPromise
+          const fs_result = await pool.request()
+              .input('field_value', sql.VarChar, foreign_value)
+              .query('select  * from '+fk_res["Referenced table"]+ " where "+foreign_name_string+" = @field_value")
+          
+          if(fs_result.recordset.length<=0)
+              continue;
+
+          foreign_value = fs_result.recordset[0][fk_res["Referenced column"]];
+
+          input_data[row][fk_res["Parent column"]] = foreign_value; 
+
+          
         }
 
         let key_val = "";
@@ -231,7 +300,15 @@ router.post('/store_validated_data', async (req, res) => {
           val_val=(val_val=="")?val_val:val_val + ", ";
   
           key_val+= key;
-          val_val+= "'"+input_data[row][key]+"'"
+          console.log(typeof input_data[row][key])
+          if(typeof input_data[row][key] === "string"){
+            input_data[row][key] = mssql_real_escape_string(input_data[row][key]);
+            console.log("yey")
+          }
+          else{
+            input_data[row][key] = "'"+input_data[row][key]+"'";
+          }
+          val_val+= input_data[row][key]
           
         }
         var query = 'INSERT INTO '+table_name+'('+key_val+') VALUES('+val_val+")";
