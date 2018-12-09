@@ -5,7 +5,6 @@ var randomstring = require("randomstring");
 const fs = require('fs');
 const xlsx = require('node-xlsx');
 const path = require('path')
-const SqlString = require('SqlString')
 const escapeString = require('sql-escape-string')
 
 var multer = require("multer")
